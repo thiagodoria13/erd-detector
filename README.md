@@ -129,7 +129,7 @@ gcloud compute ssh erd-vm --zone=asia-east2-a
   - `reject_artifacts()` - Amplitude thresholding (+/-100 microV)
   - `preprocess_trial()` - Complete 4-stage pipeline
 - [x] **hht.py** - FULLY IMPLEMENTED
-  - `empirical_mode_decomposition()` - EMD using PyEMD
+  - `empirical_mode_decomposition()` - EMD using the `EMD-signal` (PyEMD) package
   - `select_imfs_spectral()` - IMF selection (60% power in 8-30 Hz)
   - `hilbert_transform()` - Instantaneous amplitude and frequency
   - `instantaneous_power()` - Power calculation
@@ -160,6 +160,12 @@ gcloud compute ssh erd-vm --zone=asia-east2-a
 ```bash
 pip install -r requirements.txt
 ```
+
+> **Trial format**: All functions assume each trial array is shaped
+> `(samples, channels)` (as returned by `extract_trial`) and that the first
+> sample occurs **-3 s relative to the cue** (the default extraction window
+> [-3 s, +4 s]). If you use a different window, pass the appropriate
+> `trial_start_time` to `ERDDetector`.
 
 ```python
 from erd_detector import ERDDetector

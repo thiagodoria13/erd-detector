@@ -303,6 +303,11 @@ def preprocess_trial(
     3. Surface Laplacian filter (motor channels only)
     4. Extract motor and reference channels
 
+    Input Orientation:
+        trial_data can be either (n_samples, n_channels) — as returned by
+        `extract_trial` — or (n_channels, n_samples). The function automatically
+        converts to channel-first order internally.
+
     Args:
         trial_data: Raw EEG data, shape (n_channels, n_samples)
         channels: List of channel names
@@ -343,6 +348,27 @@ def preprocess_trial(
     Raises:
         ValueError: If required channels are not found in data
     """
+    # Ensure data is a floating-point numpy array
+    data = np.asarray(trial_data, dtype=np.float64)
+
+    if data.ndim != 2:
+        raise ValueError(
+            f"trial_data must be 2D (time x channels or channels x time), got shape {data.shape}"
+        )
+
+    n_channels_expected = len(channels)
+
+    # Normalize orientation to channel-first (n_channels, n_samples)
+    if data.shape[0] == n_channels_expected and data.shape[1] != n_channels_expected:
+        data_ch_first = data
+    elif data.shape[1] == n_channels_expected:
+        data_ch_first = data.T
+    else:
+        raise ValueError(
+            "trial_data shape does not match provided channels list. "
+            f"Shape: {data.shape}, expected one axis to equal len(channels)={n_channels_expected}"
+        )
+
     # Set default bandpass parameters if not provided
     if bandpass_params is None:
         bandpass_params = {
@@ -353,8 +379,8 @@ def preprocess_trial(
 
     # STAGE 1: Artifact Detection (on raw data)
     # Check raw data before any processing to avoid wasting computation
-    is_clean, _ = reject_artifacts(trial_data, threshold=artifact_threshold)
-    max_amplitude = np.max(np.abs(trial_data))  # Store for logging
+    is_clean, _ = reject_artifacts(data_ch_first, threshold=artifact_threshold)
+    max_amplitude = np.max(np.abs(data_ch_first))  # Store for logging
 
     # Note: We continue processing even if artifacts detected
     # The calling function decides whether to use this trial
@@ -363,7 +389,7 @@ def preprocess_trial(
     # STAGE 2: Bandpass Filtering (all channels)
     # Apply to all channels to maintain consistency
     filtered_data = bandpass_filter(
-        trial_data,
+        data_ch_first,
         fs,
         lowcut=bandpass_params['lowcut'],
         highcut=bandpass_params['highcut'],

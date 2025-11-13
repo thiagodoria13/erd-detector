@@ -25,7 +25,8 @@ from . import hht
 def calculate_baseline(
     reference_data: np.ndarray,
     fs: float,
-    baseline_window: Tuple[float, float] = (-3.0, -1.0)
+    baseline_window: Tuple[float, float] = (-3.0, -1.0),
+    trial_start_time: float = -3.0
 ) -> Tuple[float, float]:
     """
     Calculate baseline statistics from reference channels.
@@ -36,9 +37,9 @@ def calculate_baseline(
     Args:
         reference_data: Reference channel data after HHT, shape (n_ref_channels, n_samples)
         fs: Sampling frequency in Hz
-        baseline_window: Time window for baseline (start, end) in seconds
-                        Negative values indicate pre-stimulus period
-                        Default: (-3.0, -1.0) = 2 seconds before stimulus
+        baseline_window: Time window for baseline (start, end) relative to cue (s)
+                         Default: (-3.0, -1.0) = 2 seconds before stimulus
+        trial_start_time: Time of sample index 0 relative to cue (s). Default -3.0
 
     Returns:
         Tuple of (baseline_mean, baseline_std)
@@ -53,10 +54,13 @@ def calculate_baseline(
     """
     n_samples = reference_data.shape[1]
 
-    # Convert time window to sample indices
-    # Assume time 0 is at sample 0 (will be adjusted by caller if needed)
-    start_idx = max(0, int((baseline_window[0]) * fs))
-    end_idx = min(n_samples, int((baseline_window[1]) * fs))
+    # Convert desired time window (relative to cue) into indices of this trial
+    # Index 0 corresponds to trial_start_time seconds relative to cue.
+    start_idx = int((baseline_window[0] - trial_start_time) * fs)
+    end_idx = int((baseline_window[1] - trial_start_time) * fs)
+
+    start_idx = max(0, start_idx)
+    end_idx = min(n_samples, end_idx)
 
     if start_idx >= end_idx:
         raise ValueError(
@@ -91,7 +95,8 @@ def detect_erd_sliding_window(
     step_size: float = 0.05,
     threshold_sigma: float = -2.0,
     min_channels: int = 2,
-    task_window: Tuple[float, float] = (0.0, 4.0)
+    task_window: Tuple[float, float] = (0.0, 4.0),
+    trial_start_time: float = -3.0
 ) -> Dict:
     """
     Detect ERD using sliding window with -2 sigma threshold.
@@ -114,8 +119,9 @@ def detect_erd_sliding_window(
         step_size: Step size for sliding window (default: 0.05s = 50ms)
         threshold_sigma: Detection threshold in sigma units (default: -2.0)
         min_channels: Minimum number of channels for detection (default: 2)
-        task_window: Time window for detection (start, end) in seconds
-                    Default: (0.0, 4.0) = 4 seconds after stimulus
+        task_window: Time window for detection (start, end) relative to cue (seconds)
+                     Default: (0.0, 4.0) = 4 seconds after stimulus
+        trial_start_time: Time of sample index 0 relative to cue (seconds)
 
     Returns:
         Dictionary containing:
@@ -139,9 +145,12 @@ def detect_erd_sliding_window(
     window_samples = int(window_size * fs)
     step_samples = int(step_size * fs)
 
-    # Convert task window to sample indices
-    start_idx = max(0, int(task_window[0] * fs))
-    end_idx = min(n_samples, int(task_window[1] * fs))
+    # Convert task window (relative to cue) to sample indices in trial
+    start_idx = int((task_window[0] - trial_start_time) * fs)
+    end_idx = int((task_window[1] - trial_start_time) * fs)
+
+    start_idx = max(0, start_idx)
+    end_idx = min(n_samples, end_idx)
 
     if start_idx >= end_idx:
         raise ValueError(
@@ -170,8 +179,8 @@ def detect_erd_sliding_window(
         win_start = start_idx + win_idx * step_samples
         win_end = win_start + window_samples
 
-        # Window center time (in seconds)
-        window_times[win_idx] = (win_start + window_samples // 2) / fs
+        # Window center time relative to cue (seconds)
+        window_times[win_idx] = trial_start_time + (win_start + window_samples / 2) / fs
 
         # Process each motor channel
         for ch_idx in range(n_motor_channels):
@@ -199,9 +208,8 @@ def detect_erd_sliding_window(
     # Get onset time (first detection)
     if detected:
         onset_time = detection_times[0]
-        onset_sample = int(onset_time * fs)
-        # Latency is time from task onset (assumed to be at time 0)
-        latency = onset_time - task_window[0]
+        onset_sample = int((onset_time - trial_start_time) * fs)
+        latency = onset_time  # already relative to cue (time 0)
     else:
         onset_time = None
         onset_sample = None
@@ -251,6 +259,7 @@ class ERDDetector:
         task_window: Tuple[float, float] = (0.0, 4.0),
         detection_window_size: float = 0.2,
         detection_step_size: float = 0.05,
+        trial_start_time: float = -3.0,
         bandpass_params: Optional[Dict] = None,
         artifact_threshold: float = 100.0,
         hht_freq_band: Tuple[float, float] = (8.0, 30.0),
@@ -268,6 +277,7 @@ class ERDDetector:
             task_window: Task time window (default: (0.0, 4.0))
             detection_window_size: Sliding window size in s (default: 0.2)
             detection_step_size: Sliding window step in s (default: 0.05)
+            trial_start_time: Time of first sample relative to cue (default: -3.0s)
             bandpass_params: Bandpass filter parameters (default: 8-30 Hz, order 5)
             artifact_threshold: Artifact threshold in microV (default: 100)
             hht_freq_band: HHT frequency band (default: (8.0, 30.0))
@@ -281,6 +291,7 @@ class ERDDetector:
         self.task_window = task_window
         self.detection_window_size = detection_window_size
         self.detection_step_size = detection_step_size
+        self.trial_start_time = trial_start_time
         self.artifact_threshold = artifact_threshold
         self.hht_freq_band = hht_freq_band
         self.hht_power_threshold = hht_power_threshold
@@ -299,7 +310,8 @@ class ERDDetector:
         self,
         trial_data: np.ndarray,
         channels: List[str],
-        fs: float
+        fs: float,
+        trial_start_time: Optional[float] = None
     ) -> Dict:
         """
         Process a single trial and detect ERD.
@@ -314,6 +326,8 @@ class ERDDetector:
             trial_data: Raw EEG data, shape (n_channels, n_samples)
             channels: List of channel names
             fs: Sampling frequency in Hz
+            trial_start_time: Time (s) of first sample relative to cue. Defaults to
+                               detector setting (e.g., -3.0s for [-3,+4] trials).
 
         Returns:
             Dictionary containing:
@@ -377,10 +391,14 @@ class ERDDetector:
         reference_power = np.array(reference_power)  # Shape: (n_ref, n_samples)
 
         # STAGE 4: Calculate baseline from reference channels
+        # Determine actual trial start (allows overriding per call)
+        trial_start = self.trial_start_time if trial_start_time is None else trial_start_time
+
         baseline_mean, baseline_std = calculate_baseline(
             reference_power,
             fs,
-            baseline_window=self.baseline_window
+            baseline_window=self.baseline_window,
+            trial_start_time=trial_start
         )
 
         # STAGE 5: Detect ERD in motor channels
@@ -393,7 +411,8 @@ class ERDDetector:
             step_size=self.detection_step_size,
             threshold_sigma=self.threshold_sigma,
             min_channels=self.min_channels,
-            task_window=self.task_window
+            task_window=self.task_window,
+            trial_start_time=trial_start
         )
 
         # Add preprocessing info to result
@@ -403,7 +422,8 @@ class ERDDetector:
             'motor_channels_used': preproc_result['motor_channels'],
             'reference_channels_used': preproc_result['reference_channels'],
             'baseline_mean': baseline_mean,
-            'baseline_std': baseline_std
+            'baseline_std': baseline_std,
+            'trial_start_time': trial_start
         })
 
         return detection_result

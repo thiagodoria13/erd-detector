@@ -18,7 +18,17 @@ Author: Lucas Pereira da Fonseca, Thiago Anversa Sampaio Doria
 
 import numpy as np
 from scipy.signal import hilbert, welch
-from PyEMD import EMD
+# EMD-signal publishes the implementation under the `pyemd` package but
+# original docs reference `PyEMD`. Support both import paths gracefully.
+try:
+    from PyEMD import EMD  # type: ignore
+except ImportError:  # pragma: no cover - fallback for lowercase package name
+    try:
+        from pyemd import EMD  # type: ignore
+    except ImportError as exc:  # pragma: no cover - improved error message
+        raise ImportError(
+            "PyEMD/EMD-signal is required. Install via `pip install EMD-signal`."
+        ) from exc
 from typing import List, Tuple, Dict, Optional
 import warnings
 
