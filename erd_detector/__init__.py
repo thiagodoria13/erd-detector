@@ -25,5 +25,7 @@ paradigms: an investigation into BCI illiteracy. GigaScience, 8(5).
 __version__ = "1.0.0"
 __author__ = "Lucas Pereira da Fonseca, Thiago Anversa Sampaio Doria"
 
-# Imports will be added as modules are created
-__all__ = []
+# Import implemented modules
+from . import preprocessing
+
+__all__ = ['preprocessing']
