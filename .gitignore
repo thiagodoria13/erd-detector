@@ -44,3 +44,8 @@ Thumbs.db
 
 # Temporary status/notes files
 STATUS_SUMMARY.txt
+
+# Local testing outputs
+test_results.png
+test_*.png
+test_*.pdf

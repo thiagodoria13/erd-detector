@@ -67,11 +67,33 @@ erd-detector/
 
 ### Local Setup (For Testing)
 
+**Automated Setup (Recommended):**
+
+Windows (CMD):
+```cmd
+setup_local_test.bat
+```
+
+Git Bash / Linux / Mac:
 ```bash
-cd /c/Users/Thiago\ Doria/Desktop/EEG/erd-detector
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+bash setup_local_test.sh
+```
+
+**Manual Setup:**
+```bash
+# Create virtual environment
+python -m venv .venv
+
+# Activate (choose one based on your system)
+.venv\Scripts\activate        # Windows CMD
+source .venv/Scripts/activate  # Git Bash on Windows
+source .venv/bin/activate      # Linux/Mac
+
+# Install dependencies
+pip install --upgrade pip
 pip install -r requirements.txt
+
+# Optional: Install package in editable mode
 pip install -e .
 ```
 
@@ -200,6 +222,36 @@ if result['detected']:
 else:
     print("✗ No ERD detected")
 ```
+
+### Local Testing (No Dataset Required)
+
+Test the complete pipeline with **synthetic EEG data** before downloading the full dataset:
+
+```bash
+# After setup (see Installation section above)
+python test_local.py
+```
+
+The test script:
+- Generates realistic synthetic EEG with simulated ERD event
+- Runs the complete detection pipeline
+- Displays detailed results and timing
+- Creates visualization plot (`test_results.png`)
+
+**Expected output:**
+```
+[1/4] Generating synthetic EEG data...
+  - Simulated ERD: onset at +1.0s, duration 2.0s, strength 60%
+[2/4] Initializing ERD detector...
+[3/4] Processing trial through complete pipeline...
+  ✓ Pipeline completed successfully!
+[4/4] Results:
+  ✓ ERD DETECTED
+    - Onset time: 1.xxx s (relative to cue)
+    - Latency: 1.xxx s (xxx ms)
+```
+
+This confirms all modules (preprocessing, HHT, detection) are working correctly.
 
 ### What's Implemented
 
