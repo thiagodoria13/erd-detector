@@ -28,5 +28,9 @@ __author__ = "Lucas Pereira da Fonseca, Thiago Anversa Sampaio Doria"
 # Import implemented modules
 from . import preprocessing
 from . import hht
+from . import detection
 
-__all__ = ['preprocessing', 'hht']
+# Import main class for convenience
+from .detection import ERDDetector
+
+__all__ = ['preprocessing', 'hht', 'detection', 'ERDDetector']
