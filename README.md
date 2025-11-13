@@ -117,17 +117,29 @@ gcloud compute ssh erd-vm --zone=asia-east2-a
 ### ✅ Completed
 - [x] **Project structure** - Complete directory layout
 - [x] **Documentation** - README, CLOUD_SETUP, requirements.txt, setup.py
+- [x] **Git repository** - Initialized with LICENSE and .gitignore
 - [x] **utils.py** - FULLY IMPLEMENTED with proper channel parsing
   - `load_openbmi_data()` - Load OpenBMI .mat files
   - `extract_trial()` - Extract trial windows
   - `get_channel_indices()` - Channel lookup
   - `create_mne_raw()` - MNE conversion
-- [x] **Git repository** - Initialized with LICENSE and .gitignore
+- [x] **preprocessing.py** - FULLY IMPLEMENTED
+  - `bandpass_filter()` - Butterworth 8-30 Hz for mu/beta isolation
+  - `laplacian_filter()` - Surface Laplacian for C3/C4 motor channels
+  - `reject_artifacts()` - Amplitude thresholding (+/-100 microV)
+  - `preprocess_trial()` - Complete 4-stage pipeline
+- [x] **hht.py** - FULLY IMPLEMENTED
+  - `empirical_mode_decomposition()` - EMD using PyEMD
+  - `select_imfs_spectral()` - IMF selection (60% power in 8-30 Hz)
+  - `hilbert_transform()` - Instantaneous amplitude and frequency
+  - `instantaneous_power()` - Power calculation
+  - `process_channel_hht()` - Complete HHT pipeline
+- [x] **detection.py** - FULLY IMPLEMENTED
+  - `calculate_baseline()` - Baseline from reference channels (O1, O2, Fz)
+  - `detect_erd_sliding_window()` - Sliding window with -2σ threshold
+  - `ERDDetector` class - Complete end-to-end pipeline
 
 ### 🔨 In Progress
-- [ ] **preprocessing.py** - Bandpass, Laplacian, artifact rejection
-- [ ] **hht.py** - EMD, Hilbert transform, IMF selection
-- [ ] **detection.py** - ERD detection with -2σ threshold
 - [ ] **metrics.py** - Performance evaluation
 - [ ] **visualization.py** - Plotting functions
 - [ ] **scripts/** - Data download and batch processing
@@ -138,37 +150,37 @@ gcloud compute ssh erd-vm --zone=asia-east2-a
 - [ ] Full dataset processing
 - [ ] Results and analysis
 
-**Current Focus**: Implementing core algorithm modules (preprocessing, HHT, detection)
+**Current Focus**: Core algorithm complete! Next: batch processing scripts and metrics
 
 ## Usage
 
-### Quick Start (ILLUSTRATIVE - NOT FUNCTIONAL YET)
+### Quick Start
 
-**⚠️ WARNING**: The following code is illustrative only. `ERDDetector` class does not exist yet and will raise `ImportError`. See "Currently Working" section below for what you can actually use today.
-
-**This example will work after implementing**: preprocessing.py, hht.py, detection.py
+**Note**: Core algorithm is fully implemented! You'll need to install dependencies first:
+```bash
+pip install -r requirements.txt
+```
 
 ```python
-# THIS CODE DOES NOT WORK YET - FOR ILLUSTRATION ONLY
-from erd_detector import ERDDetector  # ← Will raise ImportError
+from erd_detector import ERDDetector
 from erd_detector.utils import load_openbmi_data, extract_trial
 
 # Initialize detector with thesis defaults
-detector = ERDDetector(  # ← Class not implemented yet
+detector = ERDDetector(
     motor_channels=['C3', 'C4'],
     reference_channels=['O1', 'O2', 'Fz'],
     threshold_sigma=-2.0,       # Thesis default: -2σ
     min_channels=2              # Require both C3 and C4
 )
 
-# Load data (THIS WORKS NOW - utils.py is fully implemented)
+# Load data
 data = load_openbmi_data(subject_id=1, session=1, data_type='train')
 
 # Process single trial
 event_time = data['events'][0]
 trial_data = extract_trial(data['data'], event_time, data['fs'])
 
-# Detect ERD (requires detection.py implementation)
+# Detect ERD
 result = detector.process_trial(
     trial_data,
     data['channels'],
@@ -183,22 +195,23 @@ else:
     print("✗ No ERD detected")
 ```
 
-### Currently Working
+### What's Implemented
 
-```python
-# You can already use the data loading utilities:
-from erd_detector.utils import load_openbmi_data, extract_trial
+✅ **Full ERD detection pipeline** - All core modules complete:
+- Data loading (`utils.py`)
+- Preprocessing (`preprocessing.py`)
+- HHT analysis (`hht.py`)
+- ERD detection (`detection.py`)
 
-# Load OpenBMI data
-data = load_openbmi_data(subject_id=1, session=1, data_type='train')
-print(f"Loaded {len(data['events'])} trials")
-print(f"Channels: {data['channels'][:5]}...")  # Fixed channel parsing!
-print(f"Sampling rate: {data['fs']} Hz")
-```
+⚠️ **Still needed**:
+- Batch processing scripts (for all 54 subjects)
+- Performance metrics (`metrics.py`)
+- Visualization tools (`visualization.py`)
+- Unit tests
 
-### Batch Processing (Coming Soon)
+### Batch Processing (To Be Implemented)
 
-These scripts will be available once core modules are implemented:
+These scripts will process all 54 subjects:
 
 ```bash
 # Download OpenBMI dataset (to be implemented)
