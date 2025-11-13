@@ -110,9 +110,39 @@ gcloud compute instances attach-disk erd-vm \
 gcloud compute ssh erd-vm --zone=asia-east2-a
 ```
 
+## Implementation Status
+
+### ✅ Completed
+- [x] **Project structure** - Complete directory layout
+- [x] **Documentation** - README, CLOUD_SETUP, requirements.txt, setup.py
+- [x] **utils.py** - FULLY IMPLEMENTED with proper channel parsing
+  - `load_openbmi_data()` - Load OpenBMI .mat files
+  - `extract_trial()` - Extract trial windows
+  - `get_channel_indices()` - Channel lookup
+  - `create_mne_raw()` - MNE conversion
+- [x] **Git repository** - Initialized with LICENSE and .gitignore
+
+### 🔨 In Progress
+- [ ] **preprocessing.py** - Bandpass, Laplacian, artifact rejection
+- [ ] **hht.py** - EMD, Hilbert transform, IMF selection
+- [ ] **detection.py** - ERD detection with -2σ threshold
+- [ ] **metrics.py** - Performance evaluation
+- [ ] **visualization.py** - Plotting functions
+- [ ] **scripts/** - Data download and batch processing
+
+### 📋 Planned
+- [ ] Unit tests
+- [ ] Cloud deployment
+- [ ] Full dataset processing
+- [ ] Results and analysis
+
+**Current Focus**: Implementing core algorithm modules (preprocessing, HHT, detection)
+
 ## Usage
 
-### Quick Start
+### Quick Start (Coming Soon)
+
+The following example will work once core modules are implemented:
 
 ```python
 from erd_detector import ERDDetector
@@ -126,14 +156,14 @@ detector = ERDDetector(
     min_channels=2              # Require both C3 and C4
 )
 
-# Load data
+# Load data (THIS WORKS NOW - utils.py is fully implemented)
 data = load_openbmi_data(subject_id=1, session=1, data_type='train')
 
 # Process single trial
 event_time = data['events'][0]
 trial_data = extract_trial(data['data'], event_time, data['fs'])
 
-# Detect ERD
+# Detect ERD (requires detection.py implementation)
 result = detector.process_trial(
     trial_data,
     data['channels'],
@@ -148,19 +178,34 @@ else:
     print("✗ No ERD detected")
 ```
 
-### Batch Processing
+### Currently Working
+
+```python
+# You can already use the data loading utilities:
+from erd_detector.utils import load_openbmi_data, extract_trial
+
+# Load OpenBMI data
+data = load_openbmi_data(subject_id=1, session=1, data_type='train')
+print(f"Loaded {len(data['events'])} trials")
+print(f"Channels: {data['channels'][:5]}...")  # Fixed channel parsing!
+print(f"Sampling rate: {data['fs']} Hz")
+```
+
+### Batch Processing (Coming Soon)
+
+These scripts will be available once core modules are implemented:
 
 ```bash
-# Download OpenBMI dataset
+# Download OpenBMI dataset (to be implemented)
 python scripts/download_data.py
 
-# Process all 54 subjects
+# Process all 54 subjects (to be implemented)
 python scripts/process_all.py
 
-# Analyze results
+# Analyze results (to be implemented)
 python scripts/analyze.py
 
-# Generate figures
+# Generate figures (to be implemented)
 python scripts/visualize.py
 ```
 
@@ -187,26 +232,14 @@ Targets from thesis:
 
 Results will be populated after processing all subjects.
 
-## Implementation Status
-
-- [x] Project structure
-- [x] Requirements and dependencies
-- [x] Utils module (data loading)
-- [ ] Preprocessing module (in progress)
-- [ ] HHT module (in progress)
-- [ ] Detection module (in progress)
-- [ ] Metrics module
-- [ ] Visualization module
-- [ ] Batch processing scripts
-- [ ] Analysis scripts
-- [ ] Documentation
-- [ ] Tests
-
 ## Next Steps
 
-1. **Complete Core Modules** - Finish implementing preprocessing, HHT, detection
-2. **Local Testing** - Test on 1-2 subjects locally
-3. **Cloud Deployment** - Set up GCP VM and download full dataset
+See [NEXT_STEPS.md](NEXT_STEPS.md) for detailed implementation roadmap.
+
+1. **Complete Core Modules** - Implement preprocessing, HHT, detection
+2. **Create Batch Scripts** - Data download and processing scripts
+3. **Local Testing** - Test on sample data
+4. **Cloud Deployment** - Set up GCP VM and download full dataset
 4. **Batch Processing** - Process all 54 subjects
 5. **Analysis** - Compute metrics and compare with baseline
 6. **Visualization** - Generate all figures for thesis

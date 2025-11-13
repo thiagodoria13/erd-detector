@@ -79,12 +79,18 @@ def load_openbmi_data(subject_id, session, data_type='train', data_dir=None):
     labels = mat['y_dec'].flatten().astype(np.int32)
     
     # chan: Channel names (extract from MATLAB nested structure)
+    # OpenBMI stores channels as nested arrays: array([['Fp1']], dtype='<U3')
+    # We need to recursively extract until we get the actual string
     channels = []
     for ch in mat['chan'].flatten():
-        if isinstance(ch, np.ndarray):
-            ch_name = str(ch[0]) if len(ch) > 0 else ''
-        else:
-            ch_name = str(ch)
+        # Recursively extract from nested arrays
+        while isinstance(ch, np.ndarray):
+            if len(ch) == 0:
+                ch = ''
+                break
+            ch = ch[0]
+        # Now ch should be a string or convertible to string
+        ch_name = str(ch) if ch else ''
         channels.append(ch_name.strip())
     
     # Create return dictionary
