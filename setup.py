@@ -27,11 +27,12 @@ setup(
     ],
     python_requires=">=3.10",
     install_requires=requirements,
-    entry_points={
-        "console_scripts": [
-            "erd-process=scripts.process_all:main",
-            "erd-analyze=scripts.analyze:main",
-            "erd-visualize=scripts.visualize:main",
-        ],
-    },
+    # entry_points will be added when scripts are implemented
+    # entry_points={
+    #     "console_scripts": [
+    #         "erd-process=scripts.process_all:main",
+    #         "erd-analyze=scripts.analyze:main",
+    #         "erd-visualize=scripts.visualize:main",
+    #     ],
+    # },
 )

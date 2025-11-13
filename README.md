@@ -1,5 +1,7 @@
 # ERD Detector: Single-Trial Event-Related Desynchronization Detection
 
+> **Note**: This README uses UTF-8 encoding for Greek letters (µ, β, σ). If you see garbled characters, view this file in a UTF-8 compatible editor or see ASCII equivalents in parentheses.
+
 Single-trial ERD detection using Hilbert-Huang Transform for Brain-Computer Interface applications.
 
 ## Overview
@@ -9,7 +11,7 @@ This package implements the methodology described in your thesis for detecting E
 ### Algorithm Components
 
 1. **Preprocessing**
-   - Bandpass filter (8-30 Hz) to isolate µ and β rhythms
+   - Bandpass filter (8-30 Hz) to isolate µ (mu) and β (beta) rhythms
    - Laplacian spatial filter for C3/C4 to enhance local activity
    - Artifact rejection using amplitude thresholding (±100µV)
 
@@ -22,8 +24,8 @@ This package implements the methodology described in your thesis for detecting E
 3. **ERD Detection**
    - Baseline calculation from reference channels (O1, O2, Fz) during [-3s, -1s]
    - Sliding window (200ms, 50ms step) through task period [0s, +4s]
-   - Normalize motor channels (C3, C4): z = (P - μ) / σ
-   - Detect ERD when z ≤ -2σ in ≥2 motor channels
+   - Normalize motor channels (C3, C4): z = (P - μ) / σ (sigma)
+   - Detect ERD when z ≤ -2σ (sigma) in ≥2 motor channels
 
 ### Key Features
 
@@ -140,16 +142,19 @@ gcloud compute ssh erd-vm --zone=asia-east2-a
 
 ## Usage
 
-### Quick Start (Coming Soon)
+### Quick Start (ILLUSTRATIVE - NOT FUNCTIONAL YET)
 
-The following example will work once core modules are implemented:
+**⚠️ WARNING**: The following code is illustrative only. `ERDDetector` class does not exist yet and will raise `ImportError`. See "Currently Working" section below for what you can actually use today.
+
+**This example will work after implementing**: preprocessing.py, hht.py, detection.py
 
 ```python
-from erd_detector import ERDDetector
+# THIS CODE DOES NOT WORK YET - FOR ILLUSTRATION ONLY
+from erd_detector import ERDDetector  # ← Will raise ImportError
 from erd_detector.utils import load_openbmi_data, extract_trial
 
 # Initialize detector with thesis defaults
-detector = ERDDetector(
+detector = ERDDetector(  # ← Class not implemented yet
     motor_channels=['C3', 'C4'],
     reference_channels=['O1', 'O2', 'Fz'],
     threshold_sigma=-2.0,       # Thesis default: -2σ
