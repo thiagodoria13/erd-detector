@@ -27,5 +27,6 @@ __author__ = "Lucas Pereira da Fonseca, Thiago Anversa Sampaio Doria"
 
 # Import implemented modules
 from . import preprocessing
+from . import hht
 
-__all__ = ['preprocessing']
+__all__ = ['preprocessing', 'hht']
