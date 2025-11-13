@@ -223,35 +223,50 @@ else:
     print("✗ No ERD detected")
 ```
 
-### Local Testing (No Dataset Required)
+### Local Testing with Real Data
 
-Test the complete pipeline with **synthetic EEG data** before downloading the full dataset:
+Test the complete pipeline with **real OpenBMI EEG data** (small sample, ~4-8 GB):
 
+**Step 1: Download sample data**
 ```bash
-# After setup (see Installation section above)
+python download_sample_data.py
+```
+
+This provides instructions to download 1-2 subjects from the OpenBMI dataset.
+Files to download manually:
+- `sess01_subj01_EEG_MI.mat` (~2 GB)
+- `sess02_subj01_EEG_MI.mat` (~2 GB)
+
+Download from: https://gigadb.org/dataset/100542
+Save to: `data/openbmi_sample/`
+
+**Step 2: Run tests**
+```bash
 python test_local.py
 ```
 
 The test script:
-- Generates realistic synthetic EEG with simulated ERD event
-- Runs the complete detection pipeline
-- Displays detailed results and timing
-- Creates visualization plot (`test_results.png`)
+- Loads real EEG trials from OpenBMI dataset
+- Processes 5 trials through complete pipeline
+- Shows detection results and statistics
+- Creates visualization plots for each trial
 
 **Expected output:**
 ```
-[1/4] Generating synthetic EEG data...
-  - Simulated ERD: onset at +1.0s, duration 2.0s, strength 60%
-[2/4] Initializing ERD detector...
-[3/4] Processing trial through complete pipeline...
-  ✓ Pipeline completed successfully!
-[4/4] Results:
-  ✓ ERD DETECTED
-    - Onset time: 1.xxx s (relative to cue)
-    - Latency: 1.xxx s (xxx ms)
+[1/5] Checking for OpenBMI data files...
+  ✓ Found 2 data file(s)
+[2/5] Loading EEG data...
+  ✓ Loaded 100 trials
+[3/5] Initializing ERD detector...
+[4/5] Processing trials...
+  Trial 1/5:
+    ✓ ERD detected at 1.xxx s (latency: xxx ms)
+[5/5] Summary:
+  ERD detected: X/5 trials
+  Average latency: XXX ms
 ```
 
-This confirms all modules (preprocessing, HHT, detection) are working correctly.
+This validates the pipeline on real motor imagery data.
 
 ### What's Implemented
 
