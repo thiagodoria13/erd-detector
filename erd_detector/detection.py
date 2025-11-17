@@ -91,7 +91,11 @@ def detect_erd_sliding_window(
     threshold_sigma: float = -2.0,
     min_channels: int = 2,
     task_window: Tuple[float, float] = (0.0, 4.0),
-    trial_start_time: float = -3.0
+    trial_start_time: float = -3.0,
+    use_temporal_weight: bool = True,
+    penalty_center: float = 0.6,
+    penalty_sigma: float = 0.25,
+    penalty_floor: float = 0.3
 ) -> Dict:
     """
     Detect ERD using sliding window with -2 sigma threshold.
@@ -117,6 +121,10 @@ def detect_erd_sliding_window(
         task_window: Time window for detection (start, end) relative to cue (seconds)
                      Default: (0.0, 4.0) = 4 seconds after stimulus
         trial_start_time: Time of sample index 0 relative to cue (seconds)
+        use_temporal_weight: If True, apply Gaussian time weighting
+        penalty_center: Center of Gaussian weight (seconds relative to cue)
+        penalty_sigma: Sigma of Gaussian weight (seconds)
+        penalty_floor: Minimum weight value (to avoid zeroing far windows)
 
     Returns:
         Dictionary containing:
@@ -169,9 +177,15 @@ def detect_erd_sliding_window(
 
     # Initialize storage for results
     z_scores = np.zeros((n_motor_channels, n_windows))
-    detection_count = np.zeros(n_windows, dtype=int)
+    detection_count = np.zeros(n_windows, dtype=float)
     window_times = np.zeros(n_windows)
     detection_times = []
+
+    # Precompute temporal weights (Gaussian around expected ERD timing)
+    weights = np.ones(n_windows)
+    if use_temporal_weight:
+        weights = np.exp(-0.5 * ((window_times - penalty_center) / penalty_sigma) ** 2)
+        weights = np.clip(weights, penalty_floor, 1.0)
 
     # Slide window through task period
     for win_idx in range(n_windows):
@@ -181,6 +195,13 @@ def detect_erd_sliding_window(
 
         # Window center time relative to cue (seconds)
         window_times[win_idx] = trial_start_time + (win_start + window_samples / 2) / fs
+
+        # Update weight now that window_times is set
+        if use_temporal_weight:
+            weights[win_idx] = np.exp(-0.5 * ((window_times[win_idx] - penalty_center) / penalty_sigma) ** 2)
+            weights[win_idx] = np.clip(weights[win_idx], penalty_floor, 1.0)
+        else:
+            weights[win_idx] = 1.0
 
         # Process each motor channel
         for ch_idx in range(n_motor_channels):
@@ -196,7 +217,7 @@ def detect_erd_sliding_window(
 
             # Check if this channel shows ERD (z <= threshold)
             if z <= threshold_sigma:
-                detection_count[win_idx] += 1
+                detection_count[win_idx] += weights[win_idx]
 
         # Check if ERD detected in this window (>= min_channels)
         if detection_count[win_idx] >= min_channels:
@@ -224,7 +245,8 @@ def detect_erd_sliding_window(
         'detection_times': detection_times,
         'z_scores': z_scores,
         'detection_count': detection_count,
-        'window_times': window_times
+        'window_times': window_times,
+        'window_weights': weights
     }
 
 
@@ -263,7 +285,11 @@ class ERDDetector:
         bandpass_params: Optional[Dict] = None,
         artifact_threshold: float = 100.0,
         hht_freq_band: Tuple[float, float] = (8.0, 30.0),
-        hht_power_threshold: float = 0.6
+        hht_power_threshold: float = 0.6,
+        use_temporal_weight: bool = True,
+        penalty_center: float = 0.6,
+        penalty_sigma: float = 0.25,
+        penalty_floor: float = 0.3
     ):
         """
         Initialize ERD Detector.
@@ -295,6 +321,10 @@ class ERDDetector:
         self.artifact_threshold = artifact_threshold
         self.hht_freq_band = hht_freq_band
         self.hht_power_threshold = hht_power_threshold
+        self.use_temporal_weight = use_temporal_weight
+        self.penalty_center = penalty_center
+        self.penalty_sigma = penalty_sigma
+        self.penalty_floor = penalty_floor
 
         # Set bandpass parameters
         if bandpass_params is None:
@@ -414,7 +444,11 @@ class ERDDetector:
             threshold_sigma=self.threshold_sigma,
             min_channels=self.min_channels,
             task_window=self.task_window,
-            trial_start_time=trial_start
+            trial_start_time=trial_start,
+            use_temporal_weight=self.use_temporal_weight,
+            penalty_center=self.penalty_center,
+            penalty_sigma=self.penalty_sigma,
+            penalty_floor=self.penalty_floor
         )
 
         # Add preprocessing info to result

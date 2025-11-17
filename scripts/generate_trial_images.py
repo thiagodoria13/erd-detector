@@ -154,6 +154,13 @@ def plot_trial(trial_data, channels, result, trial_idx, out_path, detector):
         axes[4].plot(window_times, z_scores[0, :], color="C0", linewidth=0.9, label="Z-score C3")
         axes[4].axhline(0, color="k", linestyle="--", alpha=0.6, label="Baseline (0)")
         axes[4].axhline(thr_sigma, color="r", linestyle="--", alpha=0.8, label="Limiar")
+        # Gaussian weight overlay (0-1)
+        if "window_weights" in result:
+            ax2 = axes[4].twinx()
+            ax2.fill_between(window_times, result["window_weights"], color="gray", alpha=0.15, step="mid")
+            ax2.set_ylim(0, 1.05)
+            ax2.set_yticks([0, 0.5, 1.0])
+            ax2.set_ylabel("Peso temporal (gaussiana)", fontsize=8)
         axes[4].set_ylabel("Z (C3)")
         axes[4].set_title("Z-score C3 (baseline 0, limiar vermelho)")
         add_spans(axes[4])
@@ -164,6 +171,13 @@ def plot_trial(trial_data, channels, result, trial_idx, out_path, detector):
         axes[5].plot(window_times, z_scores[1, :], color="C1", linewidth=0.9, label="Z-score C4")
         axes[5].axhline(0, color="k", linestyle="--", alpha=0.6, label="Baseline (0)")
         axes[5].axhline(thr_sigma, color="r", linestyle="--", alpha=0.8, label="Limiar")
+        # Gaussian weight overlay
+        if "window_weights" in result:
+            ax2b = axes[5].twinx()
+            ax2b.fill_between(window_times, result["window_weights"], color="gray", alpha=0.15, step="mid")
+            ax2b.set_ylim(0, 1.05)
+            ax2b.set_yticks([0, 0.5, 1.0])
+            ax2b.set_ylabel("Peso temporal (gaussiana)", fontsize=8)
         axes[5].set_ylabel("Z (C4)")
         axes[5].set_title("Z-score C4 (baseline 0, limiar vermelho)")
         add_spans(axes[5])
