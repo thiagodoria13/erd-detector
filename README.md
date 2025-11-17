@@ -229,16 +229,19 @@ Test the complete pipeline with **real OpenBMI EEG data** (small sample, ~4-8 GB
 
 **Step 1: Download sample data**
 ```bash
+# Automatic download from Wasabi CDN (fast, with resume support)
 python download_sample_data.py
+
+# Or download specific subjects/sessions
+python download_sample_data.py --subjects 1,3 --sessions 1,2
 ```
 
-This provides instructions to download 1-2 subjects from the OpenBMI dataset.
-Files to download manually:
-- `sess01_subj01_EEG_MI.mat` (~2 GB)
-- `sess02_subj01_EEG_MI.mat` (~2 GB)
-
-Download from: https://gigadb.org/dataset/100542
-Save to: `data/openbmi_sample/`
+Features:
+- Downloads from Wasabi S3 CDN (faster than FTP)
+- **Resume support** - interrupt and restart safely
+- Progress bars for each file
+- Default: Subjects 1-2, Sessions 1-2 (~8 GB total)
+- Saved to: `data/openbmi_sample/`
 
 **Step 2: Run tests**
 ```bash

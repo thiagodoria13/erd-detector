@@ -1,41 +1,132 @@
 #!/usr/bin/env python
 """
-Download a small sample of OpenBMI dataset for local testing.
+Download OpenBMI sample data for local testing using Wasabi URLs.
 
-This script downloads data for 1-2 subjects (~4-8 GB) instead of the full
-209 GB dataset, allowing for local testing with real EEG data.
+This script downloads 1-2 subjects from the OpenBMI dataset using fast
+Wasabi S3 URLs with resume support and progress bars.
 
 OpenBMI Motor Imagery Dataset:
 - 54 subjects total
 - 2 sessions per subject
-- Each session: ~2 GB (100 trials)
+- Each file: ~2 GB (100 trials)
 - Source: https://gigadb.org/dataset/100542
 
 Usage:
-    python download_sample_data.py
+    python download_sample_data.py [--subjects 1,2] [--sessions 1,2]
 
 Author: Lucas Pereira da Fonseca, Thiago Anversa Sampaio Doria
 """
 
-import os
+import argparse
 import urllib.request
+import urllib.error
 import sys
 from pathlib import Path
 from tqdm import tqdm
+import time
 
 
 class DownloadProgressBar(tqdm):
-    """Progress bar for urllib downloads."""
+    """Progress bar for urllib downloads with resume support."""
+
     def update_to(self, b=1, bsize=1, tsize=None):
         if tsize is not None:
             self.total = tsize
         self.update(b * bsize - self.n)
 
 
-def download_url(url, output_path):
-    """Download file with progress bar."""
-    with DownloadProgressBar(unit='B', unit_scale=True, miniters=1, desc=output_path.name) as t:
-        urllib.request.urlretrieve(url, filename=output_path, reporthook=t.update_to)
+def download_with_resume(url, output_path, max_retries=3, timeout=300):
+    """
+    Download file with resume support and retries.
+
+    Args:
+        url: URL to download from
+        output_path: Path to save file
+        max_retries: Maximum number of retry attempts
+        timeout: Timeout in seconds for each attempt
+
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    output_path = Path(output_path)
+    temp_path = output_path.with_suffix(output_path.suffix + '.part')
+
+    # Check if complete file exists
+    if output_path.exists():
+        print(f"  [Exists] {output_path.name}")
+        return True
+
+    # Get file size from server
+    try:
+        req = urllib.request.Request(url, method='HEAD')
+        with urllib.request.urlopen(req, timeout=30) as response:
+            total_size = int(response.headers.get('Content-Length', 0))
+    except Exception as e:
+        print(f"  [Error] Could not get file size: {e}")
+        return False
+
+    # Check if partial download exists
+    resume_pos = 0
+    if temp_path.exists():
+        resume_pos = temp_path.stat().st_size
+        if resume_pos >= total_size:
+            # Partial file is complete, rename it
+            temp_path.rename(output_path)
+            print(f"  [Complete] {output_path.name}")
+            return True
+        print(f"  [Resume] from {resume_pos / (1024**3):.2f} GB")
+
+    # Download with retries
+    for attempt in range(max_retries):
+        try:
+            # Prepare request with resume header
+            req = urllib.request.Request(url)
+            if resume_pos > 0:
+                req.add_header('Range', f'bytes={resume_pos}-')
+
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                # Open file in append mode if resuming
+                mode = 'ab' if resume_pos > 0 else 'wb'
+
+                with open(temp_path, mode) as f:
+                    with DownloadProgressBar(
+                        unit='B',
+                        unit_scale=True,
+                        miniters=1,
+                        desc=output_path.name,
+                        total=total_size,
+                        initial=resume_pos
+                    ) as pbar:
+                        chunk_size = 1024 * 1024  # 1 MB chunks
+                        while True:
+                            chunk = response.read(chunk_size)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            pbar.update(len(chunk))
+
+            # Download complete, rename temp file
+            temp_path.rename(output_path)
+            print(f"  [Success] {output_path.name}")
+            return True
+
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            print(f"  [Attempt {attempt + 1}/{max_retries}] Failed: {e}")
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # Exponential backoff
+                print(f"  [Wait] Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                # Update resume position
+                if temp_path.exists():
+                    resume_pos = temp_path.stat().st_size
+            else:
+                print(f"  [Error] Max retries reached")
+                return False
+        except Exception as e:
+            print(f"  [Error] Unexpected error: {e}")
+            return False
+
+    return False
 
 
 def download_openbmi_sample(
@@ -44,234 +135,133 @@ def download_openbmi_sample(
     data_dir='data/openbmi_sample'
 ):
     """
-    Download sample OpenBMI data for local testing.
+    Download sample OpenBMI data from Wasabi CDN.
 
     Args:
         subjects: List of subject IDs to download (default: [1, 2])
         sessions: List of session numbers (default: [1, 2])
         data_dir: Directory to save data (default: 'data/openbmi_sample')
 
-    OpenBMI File Structure:
-        Session 1 (Training): sess01_subj{:02d}_EEG_MI.mat
-        Session 2 (Test): sess02_subj{:02d}_EEG_MI.mat
-
-    Each file contains:
-        - EEG data: 62 channels @ 1000 Hz
-        - Events: Trial markers (left hand vs right hand imagery)
-        - Channel names
-        - Sampling rate
+    Returns:
+        bool: True if all downloads successful
     """
-    # Base URL for OpenBMI dataset
-    # Note: GigaDB uses FTP. We'll provide instructions for manual download
-    base_url = "ftp://penguin.genomics.cn/pub/10.5524/100001_101000/100542"
+    # Wasabi S3 base URL (faster than GigaDB FTP)
+    base_url = "https://s3.us-west-1.wasabisys.com/gigadb-datasets/live/pub/10.5524/100001_101000/100542"
 
     # Create data directory
     data_path = Path(data_dir)
     data_path.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
-    print("OpenBMI Dataset - Sample Download")
+    print("OpenBMI Dataset - Sample Download (Wasabi CDN)")
     print("=" * 70)
     print()
-    print(f"Downloading data for {len(subjects)} subject(s), {len(sessions)} session(s) each")
-    print(f"Estimated total size: ~{len(subjects) * len(sessions) * 2} GB")
+    print(f"Downloading {len(subjects)} subject(s) × {len(sessions)} session(s)")
+    print(f"Estimated total: ~{len(subjects) * len(sessions) * 2} GB")
     print(f"Destination: {data_path.absolute()}")
     print()
 
-    # FTP downloads can be tricky, provide manual instructions
-    print("=" * 70)
-    print("DOWNLOAD INSTRUCTIONS")
-    print("=" * 70)
-    print()
-    print("Due to FTP access requirements, please download files manually:")
-    print()
-    print("Option 1: Direct Browser Download (Recommended)")
-    print("-" * 70)
-    print("1. Visit: https://gigadb.org/dataset/100542")
-    print("2. Click 'Files' tab")
-    print("3. Download these files:")
-    print()
-
-    files_to_download = []
+    # Build download list
+    downloads = []
     for subj in subjects:
         for sess in sessions:
-            if sess == 1:
-                filename = f"sess01_subj{subj:02d}_EEG_MI.mat"
-            else:
-                filename = f"sess02_subj{subj:02d}_EEG_MI.mat"
-            files_to_download.append(filename)
-            print(f"   - {filename}")
+            filename = f"sess{sess:02d}_subj{subj:02d}_EEG_MI.mat"
+            url = f"{base_url}/{filename}"
+            output = data_path / filename
+            downloads.append((url, output, filename))
 
-    print()
-    print(f"4. Save files to: {data_path.absolute()}")
-    print()
-    print("Option 2: Command Line Download (Linux/Mac)")
+    # Download files
+    print(f"Starting downloads ({len(downloads)} files)...")
     print("-" * 70)
-    print("Use wget or curl to download from FTP:")
-    print()
 
-    for filename in files_to_download:
-        ftp_url = f"{base_url}/{filename}"
-        print(f"wget {ftp_url} -P {data_dir}")
+    successful = 0
+    failed = []
 
-    print()
-    print("Option 3: Python Script Download")
-    print("-" * 70)
-    print("Run this script with ftplib:")
-    print()
+    for url, output, filename in downloads:
+        print(f"\nDownloading: {filename}")
+        if download_with_resume(url, output, max_retries=3, timeout=300):
+            successful += 1
+        else:
+            failed.append(filename)
 
-    # Create a simple FTP download helper
-    ftp_script = data_path / "download_ftp.py"
-    with open(ftp_script, 'w') as f:
-        f.write('''#!/usr/bin/env python
-"""FTP download helper for OpenBMI dataset."""
-from ftplib import FTP
-import sys
-
-def download_openbmi_ftp(files, output_dir="."):
-    """Download files from OpenBMI FTP server."""
-    ftp = FTP("penguin.genomics.cn")
-    ftp.login()  # Anonymous login
-    ftp.cwd("pub/10.5524/100001_101000/100542")
-
-    for filename in files:
-        print(f"Downloading {filename}...")
-        local_path = f"{output_dir}/{filename}"
-        with open(local_path, 'wb') as f:
-            ftp.retrbinary(f'RETR {filename}', f.write)
-        print(f"  Saved to {local_path}")
-
-    ftp.quit()
-    print("All downloads complete!")
-
-if __name__ == "__main__":
-    files = [
-''')
-        for filename in files_to_download:
-            f.write(f'        "{filename}",\n')
-        f.write(f'''    ]
-    download_openbmi_ftp(files, "{data_dir}")
-''')
-
-    print(f"python {ftp_script}")
+    # Summary
     print()
     print("=" * 70)
-    print()
+    print("Download Summary")
+    print("=" * 70)
+    print(f"Successful: {successful}/{len(downloads)}")
 
-    # Check if files already exist
-    existing_files = []
-    missing_files = []
-    for filename in files_to_download:
-        file_path = data_path / filename
-        if file_path.exists():
-            size_mb = file_path.stat().st_size / (1024 * 1024)
-            existing_files.append((filename, size_mb))
-        else:
-            missing_files.append(filename)
-
-    if existing_files:
-        print("✓ Found existing files:")
-        for filename, size_mb in existing_files:
-            print(f"  - {filename} ({size_mb:.1f} MB)")
+    if failed:
+        print(f"Failed: {len(failed)}")
+        for f in failed:
+            print(f"  - {f}")
         print()
-
-    if missing_files:
-        print("✗ Missing files:")
-        for filename in missing_files:
-            print(f"  - {filename}")
-        print()
-        print(f"Please download these files to: {data_path.absolute()}")
+        print("To retry failed downloads, run this script again.")
+        print("Partial downloads will resume automatically.")
+        return False
     else:
-        print("=" * 70)
-        print("✓ All required files are present!")
-        print("=" * 70)
+        print()
+        print("✓ All downloads complete!")
         print()
         print("You can now run:")
         print("  python test_local.py")
-
-    return data_path
-
-
-def verify_downloaded_data(data_dir='data/openbmi_sample'):
-    """Verify downloaded .mat files are valid."""
-    import scipy.io as sio
-
-    data_path = Path(data_dir)
-    mat_files = list(data_path.glob("*.mat"))
-
-    if not mat_files:
-        print(f"No .mat files found in {data_path}")
-        return False
-
-    print()
-    print("=" * 70)
-    print("Verifying downloaded files...")
-    print("=" * 70)
-    print()
-
-    all_valid = True
-    for mat_file in mat_files:
-        try:
-            print(f"Checking {mat_file.name}...")
-            data = sio.loadmat(mat_file)
-
-            # Check for required fields
-            required_keys = ['EEG_MI_train', 'EEG_MI_test']
-            has_data = any(key in data for key in required_keys)
-
-            if has_data:
-                print(f"  ✓ Valid OpenBMI file")
-                # Show file info
-                size_mb = mat_file.stat().st_size / (1024 * 1024)
-                print(f"  - Size: {size_mb:.1f} MB")
-            else:
-                print(f"  ✗ Missing required data fields")
-                all_valid = False
-
-        except Exception as e:
-            print(f"  ✗ Error reading file: {e}")
-            all_valid = False
-
-        print()
-
-    if all_valid:
-        print("=" * 70)
-        print("✓ All files verified successfully!")
-        print("=" * 70)
-    else:
-        print("=" * 70)
-        print("✗ Some files failed verification")
-        print("=" * 70)
-
-    return all_valid
+        return True
 
 
 def main():
-    """Main function."""
-    print()
-    print("OpenBMI Dataset - Sample Downloader")
-    print("For local testing with real EEG data")
-    print()
-
-    # Default: Download Subject 1 and 2, both sessions
-    subjects = [1, 2]
-    sessions = [1, 2]
-    data_dir = 'data/openbmi_sample'
-
-    # Download (provides instructions)
-    data_path = download_openbmi_sample(
-        subjects=subjects,
-        sessions=sessions,
-        data_dir=data_dir
+    """Main function with argument parsing."""
+    parser = argparse.ArgumentParser(
+        description='Download OpenBMI sample data for local testing'
+    )
+    parser.add_argument(
+        '--subjects',
+        type=str,
+        default='1,2',
+        help='Comma-separated subject IDs (default: 1,2)'
+    )
+    parser.add_argument(
+        '--sessions',
+        type=str,
+        default='1,2',
+        help='Comma-separated session numbers (default: 1,2)'
+    )
+    parser.add_argument(
+        '--output-dir',
+        type=str,
+        default='data/openbmi_sample',
+        help='Output directory (default: data/openbmi_sample)'
     )
 
-    # If scipy is available, verify files
+    args = parser.parse_args()
+
+    # Parse subjects and sessions
     try:
-        verify_downloaded_data(data_dir)
-    except ImportError:
-        print("Note: Install scipy to verify downloaded files:")
-        print("  pip install scipy")
+        subjects = [int(s.strip()) for s in args.subjects.split(',')]
+        sessions = [int(s.strip()) for s in args.sessions.split(',')]
+    except ValueError as e:
+        print(f"Error parsing subjects/sessions: {e}")
+        return 1
+
+    # Validate inputs
+    for subj in subjects:
+        if not (1 <= subj <= 54):
+            print(f"Error: Subject {subj} out of range (1-54)")
+            return 1
+
+    for sess in sessions:
+        if sess not in [1, 2]:
+            print(f"Error: Session {sess} invalid (must be 1 or 2)")
+            return 1
+
+    # Download
+    success = download_openbmi_sample(
+        subjects=subjects,
+        sessions=sessions,
+        data_dir=args.output_dir
+    )
+
+    return 0 if success else 1
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
