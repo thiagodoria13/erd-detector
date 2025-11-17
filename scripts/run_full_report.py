@@ -257,9 +257,9 @@ def main():
     detector = ERDDetector(
         motor_channels=["C3", "C4"],
         reference_channels=["O1", "O2", "Fz"],
-        threshold_sigma=-0.75,
+        threshold_sigma=-0.60,
         min_channels=1,
-        baseline_window=(-1.0, 0.0),
+        baseline_window=(-2.0, -1.0),
         task_window=(0.0, 4.0),
         trial_start_time=-3.0,
         artifact_threshold=750.0,

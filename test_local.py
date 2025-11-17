@@ -278,9 +278,9 @@ def main():
     detector = ERDDetector(
         motor_channels=['C3', 'C4'],
         reference_channels=['O1', 'O2', 'Fz'],
-        threshold_sigma=-0.75,             # -0.75 sigma threshold
+        threshold_sigma=-0.60,             # tuned threshold
         min_channels=1,                    # allow single motor channel
-        baseline_window=(-1.0, 0.0),       # self-baseline anchored right before cue
+        baseline_window=(-2.0, -1.0),      # tuned baseline
         task_window=(0.0, 4.0),            # detect only post-cue window
         detection_step_size=0.005,         # 5 ms step
         trial_start_time=-3.0,
