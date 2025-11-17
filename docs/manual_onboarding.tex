@@ -1,0 +1,121 @@
+% Manual de uso para iniciantes (baixar e rodar o ERD Detector)
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{Guia passo a passo (iniciante) \\ ERD Detector}
+\author{Projeto ERD Detector}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{O objetivo}
+Você vai baixar o projeto do GitHub e rodar tudo no seu computador. Este guia assume conhecimento zero de programação.
+
+\section*{O que você precisa}
+\begin{itemize}[leftmargin=*]
+  \item Um computador com Windows (ou macOS/Linux).
+  \item Python instalado (versão 3.10 ou superior). No Windows, baixe em: \url{https://www.python.org/downloads/}
+  \item Cerca de 3 GB livres em disco (dados + figuras).
+  \item Acesso à internet para baixar dependências e dados sample.
+\end{itemize}
+
+\section{Baixar o projeto do GitHub}
+\begin{enumerate}[leftmargin=*]
+  \item Abra o navegador e vá para \url{https://github.com/thiagodoria13/erd-detector}.
+  \item Clique em \textbf{Code} \textrightarrow{} \textbf{Download ZIP}.
+  \item Salve o arquivo ZIP em uma pasta fácil (ex.: \texttt{C:\textbackslash Downloads}).
+  \item Clique com o botão direito no ZIP e escolha \textbf{Extrair tudo}. Selecione o destino, por exemplo \texttt{C:\textbackslash erd-detector}. Lembre o caminho.
+\end{enumerate}
+
+\section{Abrir o terminal de comando}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Windows:} Aperte \texttt{Win+R}, digite \texttt{cmd} e pressione Enter. Na janela preta, troque para a pasta do projeto:
+  \begin{verbatim}
+  cd C:\erd-detector
+  \end{verbatim}
+  \item \textbf{macOS/Linux:} Abra o Terminal e navegue até a pasta:
+  \begin{verbatim}
+  cd ~/erd-detector
+  \end{verbatim}
+\end{itemize}
+
+\section{Criar o ambiente (evita bagunça no sistema)}
+\begin{enumerate}[leftmargin=*]
+  \item No terminal, digite:
+  \begin{verbatim}
+  python -m venv .venv
+  \end{verbatim}
+  \item Ative o ambiente virtual:
+    \begin{itemize}
+      \item \textbf{Windows:} \texttt{.venv\textbackslash Scripts\textbackslash activate}
+      \item \textbf{macOS/Linux:} \texttt{source .venv/bin/activate}
+    \end{itemize}
+  \item Se deu certo, o terminal mostrará algo como \texttt{(.venv)} no começo da linha.
+\end{enumerate}
+
+\section{Instalar as dependências}
+\begin{verbatim}
+pip install --upgrade pip
+pip install -r requirements.txt
+\end{verbatim}
+
+\section{Baixar os dados de exemplo}
+\begin{verbatim}
+python download_sample_data.py
+\end{verbatim}
+Isto cria a pasta \texttt{data/openbmi_sample/} com 4 arquivos \texttt{.mat} (cerca de 2 GB no total).
+
+\section{Rodar um teste rápido (5 ensaios)}
+\begin{verbatim}
+python -X utf8 test_local.py
+\end{verbatim}
+Vai aparecer um resumo no terminal e 5 figuras PNG na pasta do projeto (\texttt{test\_results\_trial\_*.png}).
+
+\section{Gerar o relatório completo (todos os 400 ensaios sample)}
+\begin{verbatim}
+python -X utf8 scripts/run_full_report.py
+\end{verbatim}
+Saídas importantes:
+\begin{itemize}[leftmargin=*]
+  \item \texttt{results/local\_report\_summary.txt} (resumo em texto)
+  \item \texttt{results/local\_report\_trials.csv} (todas as tentativas)
+  \item \texttt{results/local\_latency\_hist.png}, \texttt{results/local\_detection\_bar.png} (figuras)
+  \item \texttt{docs/local\_report.tex} (relatório em LaTeX)
+\end{itemize}
+
+\subsection*{(Opcional) Gerar PDF do relatório}
+Precisa ter LaTeX instalado (MiKTeX no Windows ou TeX Live no macOS/Linux). Depois rode:
+\begin{verbatim}
+cd docs
+pdflatex local_report.tex
+\end{verbatim}
+O PDF ficará em \texttt{docs/local\_report.pdf}.
+
+\section{Gerar 20 figuras detalhadas de ensaios}
+\begin{verbatim}
+python -X utf8 scripts/generate_trial_images.py
+\end{verbatim}
+Salva 20 figuras em \texttt{results/trial\_figures/} com:
+EEG bruto, EEG filtrado, IMF principal, Z-score por canal, potência HHT por canal, tudo com baseline/limiar marcados.
+
+\section{Benchmark opcional (velocidade 50 ms vs 5 ms)}
+\begin{verbatim}
+python -X utf8 benchmarks/step_size_benchmark.py
+\end{verbatim}
+Mostra no terminal o tempo médio por ensaio em cada configuração.
+
+\section{Dicas e solução de problemas}
+\begin{itemize}[leftmargin=*]
+  \item Se o comando \texttt{python} não funcionar, tente \texttt{python3}.
+  \item Se der erro de permissão ao instalar, verifique se o ambiente \texttt{.venv} está ativado.
+  \item Se não quiser baixar os dados, copie a pasta \texttt{data/openbmi_sample/} de alguém que já baixou.
+  \item Para ``desativar'' o ambiente, feche o terminal ou digite \texttt{deactivate}.
+\end{itemize}
+
+\end{document}
