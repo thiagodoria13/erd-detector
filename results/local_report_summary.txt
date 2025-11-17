@@ -1,0 +1,8 @@
+Resumo rápido (todas as tentativas locais)
+Total de tentativas: 400
+Detecções: 370 (92.5%)
+Ensaios limpos: 347
+Latência média: 591 ms
+Latência mediana: 300 ms
+Latência desvio-padrão: 743 ms
+Latência mín-máx: 100 – 3900 ms

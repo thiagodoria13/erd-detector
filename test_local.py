@@ -36,8 +36,11 @@ def find_data_files(data_dir='data/openbmi_sample'):
 
 
 def plot_results(trial_data, channels, result, fs=1000, trial_idx=0):
-    """Plot test results for a single trial."""
-    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    """Plot a simple, step-by-step view for a single trial."""
+    fig, axes = plt.subplots(5, 1, figsize=(12, 13), sharex=True)
+    # Always show x-axis tick labels on every panel
+    for ax in axes:
+        ax.tick_params(axis='x', labelbottom=True)
 
     # Get motor channel indices
     try:
@@ -50,18 +53,25 @@ def plot_results(trial_data, channels, result, fs=1000, trial_idx=0):
 
     # Time vector (relative to cue at t=0)
     trial_start_time = result.get('trial_start_time', -3.0)
+    baseline_window = result.get('baseline_window', (-3.0, -2.0))
+    baseline_start, baseline_end = baseline_window
     t = np.arange(trial_data.shape[0]) / fs + trial_start_time
 
-    # Plot 1: Raw EEG from motor channels
-    axes[0].plot(t, trial_data[:, c3_idx], label='C3', alpha=0.7, linewidth=0.5)
-    axes[0].plot(t, trial_data[:, c4_idx], label='C4', alpha=0.7, linewidth=0.5)
-    axes[0].axvline(0, color='k', linestyle='--', alpha=0.5, label='Cue onset')
-    axes[0].set_xlabel('Time (s)')
-    axes[0].set_ylabel('Amplitude (µV)')
-    axes[0].set_title(f'Raw EEG - Trial {trial_idx+1} - Motor Channels (C3, C4)')
-    axes[0].legend()
+    # Plot 1: Raw EEG (motor channels only)
+    axes[0].plot(t, trial_data[:, c3_idx], label='C3', alpha=0.8, linewidth=0.8)
+    axes[0].plot(t, trial_data[:, c4_idx], label='C4', alpha=0.8, linewidth=0.8)
+    axes[0].axvspan(baseline_start, baseline_end, color='gray', alpha=0.1, label='Baseline')
+    axes[0].axvspan(0.0, 4.0, color='yellow', alpha=0.1, label='Task')
+    axes[0].axvline(0, color='k', linestyle='--', alpha=0.6, label='Cue (0 s)')
+    if result.get('detected') and result.get('onset_time') is not None:
+        axes[0].axvline(result['onset_time'], color='g', linestyle='-', alpha=0.8, label='Detection')
+    axes[0].set_ylabel('µV')
+    axes[0].set_title(f'Trial {trial_idx+1}: Raw C3/C4')
+    axes[0].legend(loc='upper right', fontsize=8)
     axes[0].grid(True, alpha=0.3)
-    axes[0].set_xlim([trial_start_time, trial_start_time + trial_data.shape[0]/fs])
+    end_time = trial_start_time + trial_data.shape[0]/fs
+    axes[0].set_xlim([trial_start_time, end_time])
+    axes[0].set_xlabel('Time (s) relative to cue')
 
     # Plot 2: Z-scores over time
     if 'z_scores' in result and result['z_scores'].size > 0:
@@ -70,42 +80,112 @@ def plot_results(trial_data, channels, result, fs=1000, trial_idx=0):
 
         for ch_idx in range(z_scores.shape[0]):
             ch_name = result['motor_channels_used'][ch_idx]
-            axes[1].plot(window_times, z_scores[ch_idx, :], label=ch_name, alpha=0.7)
+            axes[1].plot(window_times, z_scores[ch_idx, :], label=ch_name, alpha=0.8)
 
         threshold = result.get('threshold_sigma', -2.0)
         axes[1].axhline(threshold, color='r', linestyle='--', label=f'Threshold ({threshold}σ)')
-        axes[1].axvline(0, color='k', linestyle='--', alpha=0.5)
+        axes[1].axvline(0, color='k', linestyle='--', alpha=0.5, label='Cue (0 s)')
+        if result['detected'] and result.get('onset_time') is not None:
+            axes[1].axvline(result['onset_time'], color='g', linestyle='-', linewidth=2, label='Detection')
 
-        if result['detected']:
-            axes[1].axvline(result['onset_time'], color='g',
-                          linestyle='-', linewidth=2, label='ERD onset')
+        axes[1].axvspan(baseline_start, baseline_end, color='gray', alpha=0.1)
+        axes[1].axvspan(0.0, 4.0, color='yellow', alpha=0.1)
 
-        axes[1].set_xlabel('Time (s)')
         axes[1].set_ylabel('Z-score')
-        axes[1].set_title('Normalized Power (Z-scores) - Sliding Window Analysis')
-        axes[1].legend()
+        axes[1].set_title('Sliding-window Z (baseline gray, task yellow)')
+        axes[1].legend(loc='upper right', fontsize=8)
         axes[1].grid(True, alpha=0.3)
+        axes[1].set_xlabel('Time (s) relative to cue')
 
-    # Plot 3: Detection summary
-    axes[2].text(0.1, 0.8, f'Trial {trial_idx+1} Detection Results:', fontsize=14, fontweight='bold')
-
-    if result['detected']:
-        axes[2].text(0.1, 0.6, "✓ ERD DETECTED", fontsize=12, color='green', fontweight='bold')
-        axes[2].text(0.1, 0.45, f"  Onset time: {result['onset_time']:.3f} s", fontsize=11)
-        axes[2].text(0.1, 0.35, f"  Latency from cue: {result['latency']:.3f} s ({result['latency']*1000:.0f} ms)",
-                    fontsize=11)
-        axes[2].text(0.1, 0.25, f"  Channels: {', '.join(result['motor_channels_used'])}", fontsize=11)
+    # Plot 3: IMF waveforms (first motor channel)
+    if 'motor_imfs' in result and len(result.get('motor_imfs', [])) > 0:
+        # Plot selected IMFs for each motor channel (up to 2 IMFs per channel to reduce clutter)
+        for ch_idx, imfs in enumerate(result['motor_imfs']):
+            if imfs is None or np.size(imfs) == 0:
+                continue
+            n_plot = min(imfs.shape[0], 2)
+            for k in range(n_plot):
+                axes[2].plot(t, imfs[k, :], label=f"{result['motor_channels_used'][ch_idx]} IMF{k+1}", alpha=0.7, linewidth=0.7)
+        axes[2].axvspan(baseline_start, baseline_end, color='gray', alpha=0.1)
+        axes[2].axvspan(0.0, 4.0, color='yellow', alpha=0.1)
+        axes[2].axvline(0, color='k', linestyle='--', alpha=0.6)
+        if result.get('detected') and result.get('onset_time') is not None:
+            axes[2].axvline(result['onset_time'], color='g', linestyle='-', alpha=0.8)
+        axes[2].set_ylabel('µV')
+        axes[2].set_title('Selected IMFs (motor channels)')
+        axes[2].legend(loc='upper right', fontsize=8)
+        axes[2].grid(True, alpha=0.3)
+        axes[2].set_xlabel('Time (s) relative to cue')
     else:
-        axes[2].text(0.1, 0.6, "✗ No ERD detected", fontsize=12, color='red')
+        axes[2].text(0.1, 0.5, "No IMFs available", fontsize=12)
+        axes[2].axis('off')
 
-    axes[2].text(0.1, 0.1, f"  Artifact status: {'Clean' if result['is_clean'] else 'Artifacts detected'}",
+    # Plot 4: Instantaneous power (HHT sum of selected IMFs)
+    if 'motor_power' in result:
+        mpower = result['motor_power']
+        axes[3].plot(t, mpower[0, :], label='C3 power', alpha=0.8, linewidth=0.8)
+        if mpower.shape[0] > 1:
+            axes[3].plot(t, mpower[1, :], label='C4 power', alpha=0.8, linewidth=0.8)
+
+        baseline_req = result.get('baseline_mean', None)
+        baseline_std = result.get('baseline_std', None)
+        thr_sigma = result.get('threshold_sigma', -0.5)
+        if baseline_req is not None and baseline_std is not None:
+            baseline_req = np.asarray(baseline_req).flatten()
+            baseline_std = np.asarray(baseline_std).flatten()
+            for ch_idx in range(min(mpower.shape[0], baseline_req.shape[0])):
+                ch_label = result['motor_channels_used'][ch_idx]
+                axes[3].axhline(
+                    baseline_req[ch_idx],
+                    color='k',
+                    linestyle='--',
+                    alpha=0.6 if ch_idx == 0 else 0.3,
+                    label=f'{ch_label} baseline' if ch_idx == 0 else None
+                )
+                axes[3].axhline(
+                    baseline_req[ch_idx] + thr_sigma * baseline_std[ch_idx],
+                    color='r',
+                    linestyle='--',
+                    alpha=0.6 if ch_idx == 0 else 0.3,
+                    label=f'{ch_label} threshold' if ch_idx == 0 else None
+                )
+
+        axes[3].axvspan(baseline_start, baseline_end, color='gray', alpha=0.1)
+        axes[3].axvspan(0.0, 4.0, color='yellow', alpha=0.1)
+        axes[3].axvline(0, color='k', linestyle='--', alpha=0.6)
+        if result.get('detected') and result.get('onset_time') is not None:
+            axes[3].axvline(result['onset_time'], color='g', linestyle='-', alpha=0.8)
+
+        axes[3].set_ylabel('Power (µV²)')
+        axes[3].set_title('Instantaneous power (HHT)')
+        axes[3].legend(loc='upper right', fontsize=8)
+        axes[3].grid(True, alpha=0.3)
+        axes[3].set_xlabel('Time (s) relative to cue')
+
+    # Plot 5: Detection summary
+    axes[4].text(0.1, 0.8, f"Trial {trial_idx+1} Detection Results:", fontsize=14, fontweight="bold")
+
+    if result["detected"]:
+        axes[4].text(0.1, 0.6, "ERD DETECTED", fontsize=12, color="green", fontweight="bold")
+        axes[4].text(0.1, 0.45, f"  Onset time: {result['onset_time']:.3f} s", fontsize=11)
+        axes[4].text(0.1, 0.35, f"  Latency from cue: {result['latency']:.3f} s ({result['latency']*1000:.0f} ms)", fontsize=11)
+        axes[4].text(0.1, 0.25, f"  Channels: {', '.join(result['motor_channels_used'])}", fontsize=11)
+    else:
+        axes[4].text(0.1, 0.6, "No ERD detected", fontsize=12, color="red")
+    axes[4].text(0.1, 0.1, f"  Artifact status: {'Clean' if result['is_clean'] else 'Artifacts detected'}",
                 fontsize=11)
-    axes[2].text(0.1, 0.0, f"  Max amplitude: {result['artifact_max']:.1f} µV", fontsize=11)
+    axes[4].text(0.1, 0.0, f"  Max amplitude: {result['artifact_max']:.1f} µV", fontsize=11)
 
-    axes[2].set_xlim(0, 1)
-    axes[2].set_ylim(0, 1)
-    axes[2].axis('off')
+    axes[4].set_xlim(0, 1)
+    axes[4].set_ylim(0, 1)
+    axes[4].axis('off')
+    axes[4].set_title('Decision summary')
 
+    # Set x-label and consistent tick marks (1 s step) for all axes except summary
+    tick_vals = np.arange(np.floor(trial_start_time), np.ceil(end_time) + 1, 1.0)
+    for ax in axes[:-1]:
+        ax.set_xticks(tick_vals)
+        ax.set_xlabel('Time (s) relative to cue')
     plt.tight_layout()
     output_file = f'test_results_trial_{trial_idx+1}.png'
     plt.savefig(output_file, dpi=150, bbox_inches='tight')
@@ -198,16 +278,22 @@ def main():
     detector = ERDDetector(
         motor_channels=['C3', 'C4'],
         reference_channels=['O1', 'O2', 'Fz'],
-        threshold_sigma=-2.0,
-        min_channels=2,
-        baseline_window=(-3.0, -1.0),
-        task_window=(0.0, 4.0),
-        trial_start_time=-3.0
+        threshold_sigma=-0.75,             # -0.75 sigma threshold
+        min_channels=1,                    # allow single motor channel
+        baseline_window=(-1.0, 0.0),       # self-baseline anchored right before cue
+        task_window=(0.0, 4.0),            # detect only post-cue window
+        detection_step_size=0.005,         # 5 ms step
+        trial_start_time=-3.0,
+        artifact_threshold=750.0,          # raised artifact gate
+        hht_power_threshold=0.35           # IMF selection for mu/beta
     )
-    print("  - Threshold: -2.0 sigma")
-    print("  - Min channels: 2 (both C3 and C4)")
-    print("  - Baseline window: -3.0s to -1.0s")
-    print("  - Task window: 0.0s to +4.0s")
+    # Print the actual parameters used (keeps logs and images consistent)
+    print(f"  - Threshold: {detector.threshold_sigma} sigma")
+    print(f"  - Min channels: {detector.min_channels}")
+    print(f"  - Baseline window: {detector.baseline_window[0]}s to {detector.baseline_window[1]}s (motor self-baseline)")
+    print(f"  - Task window: {detector.task_window[0]}s to {detector.task_window[1]}s (detection window)")
+    print(f"  - Artifact threshold: {detector.artifact_threshold:.0f} µV")
+    print(f"  - IMF power threshold: {detector.hht_power_threshold*100:.0f}% in 8-30 Hz")
     print()
 
     # Process multiple trials
@@ -274,19 +360,20 @@ def main():
     print("-" * 70)
     print()
 
-    # Plot first trial
-    print("[Plotting] Generating visualization for first trial...")
-    if successful_trials:
+    # Plot all processed trials
+    print("[Plotting] Generating visualizations for processed trials...")
+    for idx, r in enumerate(successful_trials):
         try:
+            trial_data = extract_trial(data['data'], data['events'][idx], data['fs'])
             plot_results(
-                trial_data=extract_trial(data['data'], data['events'][0], data['fs']),
+                trial_data=trial_data,
                 channels=data['channels'],
-                result=successful_trials[0],
+                result=r,
                 fs=data['fs'],
-                trial_idx=0
+                trial_idx=idx
             )
         except Exception as e:
-            print(f"  Warning: Could not generate plot: {e}")
+            print(f"  Warning: Could not generate plot for trial {idx+1}: {e}")
 
     print()
     print("=" * 70)

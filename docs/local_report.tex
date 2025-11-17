@@ -1,0 +1,57 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[brazil]{babel}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\title{Relatório Local de Detecção de ERD (OpenBMI Sample)}
+\author{Pipeline ERD Detector}
+\date{\today}
+\begin{document}
+\maketitle
+\section{Configuração}
+\begin{itemize}
+  \item Baseline: $[-1.0, 0.0]$ s (auto-referência C3/C4)
+  \item Janela de detecção: $[0, 4]$ s
+  \item Limiar: $-0{,}75\,\sigma$
+  \item Mínimo de canais: 1 (C3 ou C4)
+  \item Artefatos: limiar 750 $\mu$V
+  \item Seleção de IMF: potência $\geq 35$ por cento em 8--30 Hz
+\end{itemize}
+\section{Resultados Globais}
+\begin{tabular}{ll}
+\toprule
+Total de tentativas & 400 \\
+Detecções & 370 ( 92.5\text{ por cento} ) \\
+Ensaios limpos & 347 \\
+Latência média & 591 ms \\
+Latência mediana & 300 ms \\
+Latência desvio-padrão & 743 ms \\
+Latência mín--máx & 100 -- 3900 ms \\
+\bottomrule
+\end{tabular}
+\section{Figuras}
+\subsection{Distribuição de latências}
+\begin{center}
+\includegraphics[width=0.9\linewidth]{local_latency_hist.png}
+\end{center}
+\subsection{Taxa de detecção por sujeito-sessão}
+\begin{center}
+\includegraphics[width=0.9\linewidth]{local_detection_bar.png}
+\end{center}
+\section{Interpretação Rápida}
+\subsection{Exemplos de detecção em ensaios reais}
+\begin{center}
+\includegraphics[width=0.9\linewidth]{trial_subj01_sess01_idx003.png}\\[6pt]
+\includegraphics[width=0.9\linewidth]{trial_subj01_sess01_idx007.png}
+\end{center}
+\medskip
+Cada figura traz: EEG bruto e filtrado (C3/C4), principal IMF por canal, Z-score por canal com baseline/limiar, e potência HHT por canal com baseline/limiar. Faixas cinza = baseline; amarelo = janela de detecção; linha tracejada preta = cue (0 s); linha verde = detecção.
+\section{Interpretação Rápida}
+\begin{itemize}
+  \item A taxa de detecção reflete a configuração sensível (1 canal, -0{,}75$\sigma$), favorecendo alta sensibilidade.
+  \item A proximidade do baseline ([-1,0] s) reduz a super-detecção precoce, mas ainda captura quedas de potência pós-cue.
+  \item Ensaios com artefatos (picos $>$ 750 $\mu$V) permanecem contabilizados; considere filtragem adicional para análise final.
+\end{itemize}
+\end{document}

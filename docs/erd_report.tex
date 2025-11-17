@@ -1,0 +1,120 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amsfonts}
+\usepackage{graphicx}
+\graphicspath{{./}{../}}
+\usepackage{hyperref}
+\usepackage{siunitx}
+
+\title{Single-Trial ERD Detection on OpenBMI Motor Imagery}
+\author{Lucas Pereira da Fonseca, Thiago Anversa Sampaio Doria}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Dataset and Trial Structure}
+\begin{itemize}
+    \item Dataset: OpenBMI, Motor Imagery (MI) paradigm, Subject~1, Session~1.
+    \item Trials: 100 per session, 62 channels, sampling rate \SI{1000}{Hz}.
+    \item Trial window: \([-3\,\text{s}, +4\,\text{s}]\) around cue (cue at \(t=0\)).
+    \item Baseline window: motor self-baseline \([-3\,\text{s}, -2\,\text{s}]\).
+    \item Detection window: \([-2\,\text{s}, +4\,\text{s}]\) (pre- and post-cue).
+\end{itemize}
+
+\section{Algorithmic Pipeline (Step-by-Step)}
+\begin{enumerate}
+    \item \textbf{Trial extraction}: continuous EEG is segmented to \([-3,+4]\)~s around the cue (\(t{=}0\)); \(\texttt{trial\_start\_time}=-3\) ensures time axes are aligned.
+    \item \textbf{Preprocessing}:
+    \begin{itemize}
+        \item Band-pass filtering \(8{-}30\)~Hz (mu/beta) with a 5\textsuperscript{th}-order Butterworth, zero phase.
+        \item Surface Laplacian on C3, C4: \(C3_{\mathrm{lap}} = C3 - \mathrm{mean}(FC1,FC5,CP1,CP5)\); analogous for C4 to emphasize local motor activity.
+        \item Artifact gate: amplitude threshold (current \SI{750}{\micro V}); if exceeded, the trial is flagged.
+    \end{itemize}
+    \item \textbf{Hilbert--Huang Transform (per channel)}:
+    \begin{itemize}
+        \item EMD to obtain IMFs.
+        \item IMF selection: retain IMFs whose power in \(8{-}30\)~Hz is at least \(\texttt{hht\_power\_threshold}\) (0.35–0.40 depending on run).
+        \item Hilbert transform on selected IMFs \(\rightarrow\) instantaneous amplitude and power.
+        \item Channel band power = sum of selected IMFs' power.
+    \end{itemize}
+    \item \textbf{Baseline estimation}:
+    \[
+      \mu_{\text{base}}, \sigma_{\text{base}} \text{ from motor power in } [-3,-2]~\text{s}.
+    \]
+    \item \textbf{Sliding Z-score (window \(200\)~ms, step \(50\)~ms)}:
+    \[
+      Z = \frac{P_{\text{win}} - \mu_{\text{base}}}{\sigma_{\text{base}}}.
+    \]
+    \item \textbf{Detection rule}:
+    \begin{itemize}
+        \item Detection window: \([-2,+4]\)~s (pre- and post-cue).
+        \item Threshold: \(Z \leq \texttt{threshold\_sigma}\) (e.g., \(-0.5\)).
+        \item Channels: at least \(\texttt{min\_channels}\) motor channels must meet the threshold (currently 1 for sensitivity).
+        \item Onset: first window satisfying the criterion; latency = onset time (negative = pre-cue).
+    \end{itemize}
+\end{enumerate}
+
+\section{Current Results (first 5 trials, Subject 1, Session 1)}
+\begin{itemize}
+    \item Detections: \(4/5\) trials.
+    \item Latencies: \(-1.9\,\text{s}, -1.8\,\text{s}, -1.65\,\text{s}, -1.3\,\text{s}\); one not detected.
+    \item Clean trials: \(3/5\).
+    \item Interpretation: Loose threshold plus early detection window yields pre-cue detections; tightening threshold or requiring both channels shifts detections later / reduces false positives.
+\end{itemize}
+
+\section{What Each Parameter Does}
+\begin{itemize}
+    \item \textbf{baseline\_window}: time used to compute \(\mu,\sigma\) (earlier = cleaner rest baseline).
+    \item \textbf{task\_window}: time scanned for ERD (earlier start catches anticipation).
+    \item \textbf{threshold\_sigma}: more negative = stricter; nearer 0 = looser. We look for power drops (negative \(Z\)).
+    \item \textbf{min\_channels}: how many motor channels must cross threshold.
+    \item \textbf{artifact\_threshold}: lower = more rejections; higher = more noise passes.
+    \item \textbf{hht\_power\_threshold}: IMF band-power fraction; higher = cleaner IMFs, risk missing weak ERD; lower = noisier but more sensitive.
+    \item \textbf{trial\_start\_time}: alignment of sample 0 to cue; must match extraction window for correct timing.
+\end{itemize}
+
+\section{Notes on Ground Truth}
+OpenBMI MI data include trial onsets and class labels but no ground-truth ERD onset markers. ERD is expected during MI trials but is not guaranteed (BCI illiteracy/variability). Detection rates are a proxy; true per-trial accuracy relative to ERD timing cannot be computed without manual labels.
+
+\section{Figures}
+Upload the generated PNGs (\texttt{test\_results\_trial\_1.png}~--~\texttt{test\_results\_trial\_5.png}) alongside this \texttt{.tex} file (same folder on Overleaf). Each plot contains:
+\begin{enumerate}
+    \item Raw C3/C4 (baseline/task shaded, cue at \(0\,\text{s}\), detection line).
+    \item Sliding Z-score with threshold line.
+    \item Selected IMFs (motor channels).
+    \item Instantaneous power (HHT) with baseline mean and threshold-on-power.
+    \item Summary text.
+\end{enumerate}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{test_results_trial_1.png}
+    \caption{Trial 1 results (see text for parameter settings).}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{test_results_trial_2.png}
+    \caption{Trial 2 results.}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{test_results_trial_3.png}
+    \caption{Trial 3 results.}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{test_results_trial_4.png}
+    \caption{Trial 4 results.}
+\end{figure}
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{test_results_trial_5.png}
+    \caption{Trial 5 results.}
+\end{figure}
+
+\end{document}

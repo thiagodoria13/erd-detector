@@ -27,7 +27,7 @@ def calculate_baseline(
     fs: float,
     baseline_window: Tuple[float, float] = (-3.0, -1.0),
     trial_start_time: float = -3.0
-) -> Tuple[float, float]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Calculate baseline statistics from reference channels.
 
@@ -43,8 +43,8 @@ def calculate_baseline(
 
     Returns:
         Tuple of (baseline_mean, baseline_std)
-        - baseline_mean: Mean power across reference channels
-        - baseline_std: Standard deviation of power
+        - baseline_mean: Mean power per channel (array shape: n_channels,)
+        - baseline_std: Standard deviation per channel (array shape: n_channels,)
 
     Neurophysiological Note:
         - Reference channels should not show motor-related activity
@@ -71,25 +71,20 @@ def calculate_baseline(
     # Extract baseline period
     baseline_data = reference_data[:, start_idx:end_idx]
 
-    # Compute mean across all reference channels and time points
-    # This gives a single baseline reference value
-    baseline_mean = np.mean(baseline_data)
+    # Compute mean/std per channel (not pooled across channels)
+    baseline_mean = np.mean(baseline_data, axis=1)
+    baseline_std = np.std(baseline_data, axis=1)
 
-    # Compute standard deviation
-    baseline_std = np.std(baseline_data)
-
-    # Check for zero std (would cause division by zero in normalization)
-    if baseline_std == 0:
-        # Shouldn't happen with real EEG data, but handle gracefully
-        baseline_std = 1.0  # Avoid division by zero
+    # Avoid division by zero per channel
+    baseline_std[baseline_std == 0] = 1.0
 
     return baseline_mean, baseline_std
 
 
 def detect_erd_sliding_window(
     motor_power: np.ndarray,
-    baseline_mean: float,
-    baseline_std: float,
+    baseline_mean: np.ndarray,
+    baseline_std: np.ndarray,
     fs: float,
     window_size: float = 0.2,
     step_size: float = 0.05,
@@ -140,6 +135,11 @@ def detect_erd_sliding_window(
         - Min 2 channels: C3 + C4 must both show ERD (bilateral motor cortex)
     """
     n_motor_channels, n_samples = motor_power.shape
+    if baseline_mean.shape[0] != n_motor_channels or baseline_std.shape[0] != n_motor_channels:
+        raise ValueError(
+            f"Baseline arrays must match motor channels: got baseline_mean {baseline_mean.shape}, "
+            f"baseline_std {baseline_std.shape}, motor channels {n_motor_channels}"
+        )
 
     # Convert window parameters to samples
     window_samples = int(window_size * fs)
@@ -191,7 +191,7 @@ def detect_erd_sliding_window(
             mean_power = np.mean(window_power)
 
             # Normalize to z-score
-            z = (mean_power - baseline_mean) / baseline_std
+            z = (mean_power - baseline_mean[ch_idx]) / baseline_std[ch_idx]
             z_scores[ch_idx, win_idx] = z
 
             # Check if this channel shows ERD (z <= threshold)
@@ -255,7 +255,7 @@ class ERDDetector:
         reference_channels: List[str] = ['O1', 'O2', 'Fz'],
         threshold_sigma: float = -2.0,
         min_channels: int = 2,
-        baseline_window: Tuple[float, float] = (-3.0, -1.0),
+        baseline_window: Tuple[float, float] = (-1.0, 0.0),
         task_window: Tuple[float, float] = (0.0, 4.0),
         detection_window_size: float = 0.2,
         detection_step_size: float = 0.05,
@@ -336,8 +336,8 @@ class ERDDetector:
             - 'artifact_max': float, maximum amplitude
             - 'motor_channels_used': list of motor channel names
             - 'reference_channels_used': list of reference channel names
-            - 'baseline_mean': float
-            - 'baseline_std': float
+            - 'baseline_mean': np.ndarray (per-channel baseline mean)
+            - 'baseline_std': np.ndarray (per-channel baseline std)
 
         Raises:
             ValueError: If required channels not found or processing fails
@@ -363,6 +363,7 @@ class ERDDetector:
         # STAGE 2: HHT for motor channels
         n_motor = motor_data.shape[0]
         motor_power = []
+        motor_imfs = []
 
         for ch_idx in range(n_motor):
             hht_result = hht.process_channel_hht(
@@ -372,6 +373,7 @@ class ERDDetector:
                 power_threshold=self.hht_power_threshold
             )
             motor_power.append(hht_result['power'])
+            motor_imfs.append(hht_result.get('imfs', np.empty((0, motor_data.shape[1]))))
 
         motor_power = np.array(motor_power)  # Shape: (n_motor, n_samples)
 
@@ -390,12 +392,12 @@ class ERDDetector:
 
         reference_power = np.array(reference_power)  # Shape: (n_ref, n_samples)
 
-        # STAGE 4: Calculate baseline from reference channels
+        # STAGE 4: Calculate baseline from motor channels (self-baseline)
         # Determine actual trial start (allows overriding per call)
         trial_start = self.trial_start_time if trial_start_time is None else trial_start_time
 
         baseline_mean, baseline_std = calculate_baseline(
-            reference_power,
+            motor_power,
             fs,
             baseline_window=self.baseline_window,
             trial_start_time=trial_start
@@ -423,7 +425,11 @@ class ERDDetector:
             'reference_channels_used': preproc_result['reference_channels'],
             'baseline_mean': baseline_mean,
             'baseline_std': baseline_std,
-            'trial_start_time': trial_start
+            'trial_start_time': trial_start,
+            'motor_power': motor_power,
+            'motor_imfs': motor_imfs,
+            'baseline_window': self.baseline_window,
+            'threshold_sigma': self.threshold_sigma
         })
 
         return detection_result
