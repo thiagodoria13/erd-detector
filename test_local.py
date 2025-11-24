@@ -53,7 +53,7 @@ def plot_results(trial_data, channels, result, fs=1000, trial_idx=0):
 
     # Time vector (relative to cue at t=0)
     trial_start_time = result.get('trial_start_time', -3.0)
-    baseline_window = result.get('baseline_window', (-3.0, -2.0))
+    baseline_window = result.get('baseline_window', (-2.0, -1.0))
     baseline_start, baseline_end = baseline_window
     t = np.arange(trial_data.shape[0]) / fs + trial_start_time
 

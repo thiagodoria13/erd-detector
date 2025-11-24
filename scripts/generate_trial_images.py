@@ -71,7 +71,7 @@ def plot_trial(trial_data, channels, result, trial_idx, out_path, detector):
 
     fs = result.get("fs", 1000)
     trial_start_time = result.get("trial_start_time", -3.0)
-    baseline_window = result.get("baseline_window", (-1.0, 0.0))
+    baseline_window = result.get("baseline_window", (-2.0, -1.0))
     baseline_start, baseline_end = baseline_window
     end_time = trial_start_time + trial_data.shape[0] / fs
     t = np.arange(trial_data.shape[0]) / fs + trial_start_time

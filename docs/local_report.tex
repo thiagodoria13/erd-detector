@@ -1,29 +1,36 @@
 \documentclass[12pt]{article}
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage[brazil]{babel}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{geometry}
+\usepackage{amsmath}
+\graphicspath{{../results/}{../results/trial_figures/}}
 \geometry{margin=2cm}
-\title{Relatório Local de Detecção de ERD (OpenBMI Sample)}
+
+\title{Relatório Local de Detecção de ERD (OpenBMI)}
 \author{Pipeline ERD Detector}
 \date{\today}
+
 \begin{document}
 \maketitle
-\section{Configuração}
+
+\section{Configuração do experimento}
 \begin{itemize}
-  \item Baseline: $[-2.0, -1.0]$ s (auto-referência C3/C4, combinaçao ótima)
-  \item Janela de detecção: $[0, 4]$ s
-  \item Limiar: $-0{,}60\,\sigma$ (ajustado)
-  \item Mínimo de canais: 1 (C3 ou C4)
-  \item Artefatos: limiar 750 $\mu$V
-  \item Seleção de IMF: potência $\geq 35$ por cento em 8--30 Hz
+  \item Baseline: $[-2.0, -1.0]$ s (auto-referência C3/C4).
+  \item Janela de detecção: $[0, 4]$ s.
+  \item Limiar: $-0{,}60\,\sigma$ (1 canal com peso temporal).
+  \item Peso temporal gaussiano: centro 0,6 s; $\sigma = 0{,}25$ s; piso 0,3.
+  \item Artefatos: corte em 750 $\mu$V; IMF selecionadas $\geq 35\%$ de potência em 8--30 Hz.
+  \item Passo temporal: 5 ms (0,005 s).
 \end{itemize}
+
 \section{Resultados Globais}
 \begin{tabular}{ll}
 \toprule
 Total de tentativas & 400 \\
-Detecções & 253 ( 63.2\text{ por cento} ) \\
+Detecções & 257 (63,2\%) \\
 Ensaios limpos & 347 \\
 Latência média & 519 ms \\
 Latência mediana & 600 ms \\
@@ -31,7 +38,8 @@ Latência desvio-padrão & 109 ms \\
 Latência mín--máx & 350 -- 800 ms \\
 \bottomrule
 \end{tabular}
-\section{Figuras}
+
+\section{Figuras agregadas}
 \subsection{Distribuição de latências}
 \begin{center}
 \includegraphics[width=0.9\linewidth]{local_latency_hist.png}
@@ -40,18 +48,45 @@ Latência mín--máx & 350 -- 800 ms \\
 \begin{center}
 \includegraphics[width=0.9\linewidth]{local_detection_bar.png}
 \end{center}
-\section{Interpretação Rápida}
-\subsection{Exemplos de detecção em ensaios reais}
-\begin{center}
-\includegraphics[width=0.9\linewidth]{trial_subj01_sess01_idx003.png}\\[6pt]
-\includegraphics[width=0.9\linewidth]{trial_subj01_sess01_idx005.png}
-\end{center}
-\medskip
-Cada figura traz: EEG bruto e filtrado (C3/C4), principal IMF por canal, Z-score por canal com baseline/limiar, e potência HHT por canal com baseline/limiar. Faixas cinza = baseline; amarelo = janela de detecção; linha tracejada preta = cue (0 s); linha verde = detecção.
-\section{Interpretação Rápida}
+
+\section{Fórmulas utilizadas}
 \begin{itemize}
-\item A taxa de detecção reflete a configuração sensível (1 canal, -0{,}60$\sigma$), favorecendo alta sensibilidade.
-\item O baseline ([-2,-1] s) equilibra detecção precoce e estabilidade.
-\item Ensaios com artefatos (picos $>$ 750 $\mu$V) permanecem contabilizados; considere filtragem adicional para análise final.
+  \item Potência HHT: $P(t) = \left|\mathcal{H}\left(\text{IMF}_{\text{sel}}(t)\right)\right|^2$.
+  \item Baseline: $\mu_b = \frac{1}{N}\sum_{t \in [-2,-1]} P(t)$; $\sigma_b = \sqrt{\frac{1}{N}\sum (P(t)-\mu_b)^2}$.
+  \item Z-score: $z = \frac{\overline{P_{\text{janela}}} - \mu_b}{\sigma_b}$.
+  \item Peso temporal: $w(t) = \max\left(0.3, \exp\left(-\tfrac{1}{2}\left(\frac{t-0.6}{0.25}\right)^2\right)\right)$.
+  \item Critério: somar $w(t)$ para janelas com $z \leq -0.60\,\sigma$ até atingir 1 (equivalente a um canal “cheio”).
 \end{itemize}
+
+\section{Exemplos de detecção em ensaios reais}
+Cada página seguinte mostra: EEG bruto e filtrado (C3/C4), IMF principal por canal, Z-score com baseline/limiar/peso gaussiano e potência HHT com baseline/limiar destacados (faixa cinza = baseline, faixa amarela = janela de detecção, linha preta = cue, linha verde = detecção).
+
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx003.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx005.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx010.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx014.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx016.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx020.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx021.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx033.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx034.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx043.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx044.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx049.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx051.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx052.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx054.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx060.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx061.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj01_sess01_idx064.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj02_sess01_idx034.png}\end{center}
+\newpage\begin{center}\includegraphics[width=0.85\linewidth]{trial_subj02_sess01_idx070.png}\end{center}
+
+\section{Interpretação rápida}
+\begin{itemize}
+  \item Processamento em lotes: apenas ~4 arquivos (8 GB) ficam no disco por vez; o CSV final soma 400 ensaios.
+  \item Baseline longo e peso temporal gaussiano reduziram detecções precoces e estabilizaram o limiar.
+  \item Artefatos marcados (>750 $\mu$V) permanecem registrados para inspeção manual.
+\end{itemize}
+
 \end{document}
